@@ -41,10 +41,16 @@ Anki `addons21` directory.
 
 ### Packaged Install
 
-Zip the contents of `preview_due_button` and rename the archive to:
+Build the `.ankiaddon` archive:
+
+```sh
+make package
+```
+
+The packaged add-on will be created at:
 
 ```text
-preview_due_button.ankiaddon
+dist/preview_due_button.ankiaddon
 ```
 
 Install the `.ankiaddon` file through Anki's add-on installer.
@@ -88,5 +94,11 @@ browser.search_for(f"cid:{card_id}")
 Run a syntax check with:
 
 ```sh
-python -m py_compile preview_due_button/__init__.py
+make syntax
+```
+
+Remove generated files with:
+
+```sh
+make clean
 ```
