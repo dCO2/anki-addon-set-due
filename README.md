@@ -1,93 +1,92 @@
 # Anki Preview Due Date Button
 
-Companion Anki add-on for setting the due date of the card shown in a preview pane/window without touching the active review card.
+An Anki add-on that adds quick actions to preview windows. It lets you open the
+previewed card in Anki's Browser or set that previewed card due tomorrow without
+affecting the active review card.
 
-## Goal
+## Features
 
-When multiple preview windows are open, each window gets its own action buttons.
-Clicking a button acts on the card currently shown in that same preview window only.
+- Adds a `View` button to preview windows.
+- Adds a `Set Due Date: Tomorrow` button to preview windows.
+- Acts on the card currently shown in the clicked preview window.
+- Leaves the active review card untouched.
+- Supports multiple preview windows at once.
+
+## Why This Exists
+
+During review, you may open a separate card preview from another add-on or from
+Anki's preview UI. Sometimes the previewed card needs a scheduling action, but
+the current review card should not be affected. This add-on keeps those two
+contexts separate.
+
+If several preview windows are open, each window's buttons affect only the card
+shown in that window.
+
+## Installation
+
+### Development Install
+
+Clone this repository and symlink the add-on package into Anki's `addons21`
+folder:
+
+```sh
+ln -s /path/to/anki-preview-due-date-button/preview_due_button \
+  "$HOME/Library/Application Support/Anki2/addons21/preview_due_button"
+```
+
+Then restart Anki.
+
+On Windows and Linux, replace the Anki profile path with the location of your
+Anki `addons21` directory.
+
+### Packaged Install
+
+Zip the contents of `preview_due_button` and rename the archive to:
 
 ```text
-Review card A remains active
-Preview window 1 shows card B -> buttons affect B
-Preview window 2 shows card C -> buttons affect C
-Preview window 3 shows card D -> buttons affect D
+preview_due_button.ankiaddon
 ```
+
+Install the `.ankiaddon` file through Anki's add-on installer.
+
+## Usage
+
+1. Open a card preview window.
+2. Click `View` to open the previewed card in Anki's Browser.
+3. Click `Set Due Date: Tomorrow` to set the previewed card due tomorrow.
+
+The buttons resolve the current card from the preview window where they were
+clicked.
 
 ## Architecture
 
-The button must be instance-local:
+The actions are instance-local:
 
 - do not use `mw.reviewer.card`
 - do not use Browser selection
 - do not use global "current card" state
 - do resolve the card from the preview window/pane that owns the clicked button
 
-The add-on currently adds two buttons:
+The current implementation patches Anki's multi-card preview dialog and uses
+the preview window's own `card()` method at click time. This keeps each action
+local to the preview window whose button was clicked.
 
-- `View`: opens the previewed card in Anki's Browser using `cid:<card id>`.
-- `Set Due Date: Tomorrow`: sets the previewed card due tomorrow.
-
-The scheduling operation itself is small:
+The scheduling operation uses Anki's scheduler:
 
 ```python
 mw.col.sched.set_due_date([card_id], "1")
 ```
 
-The current implementation patches Anki's multi-card preview dialog and uses
-the preview window's own `card()` method at click time. This keeps each action
-local to the preview window whose button was clicked.
-
-## Implementation Workflow
-
-1. Patch `aqt.browser.previewer.MultiCardPreviewer._create_gui`.
-2. Let Anki create the normal preview window UI.
-3. Add a spacer, then `View` and `Set Due Date: Tomorrow` buttons to that preview window's button box.
-4. On click, ask that same preview instance for its current card id.
-5. For `View`, open Anki's Browser filtered to that one card.
-6. For `Set Due Date: Tomorrow`, call Anki's scheduler for that one card id.
-7. Show a tooltip.
-
-## Preferred Strategy
-
-Patch the preview dialog UI creation method:
+The Browser action opens Anki's Browser with a card-specific search:
 
 ```python
-original_create_gui = MultiCardPreviewer._create_gui
-
-def patched_create_gui(self, *args, **kwargs):
-    result = original_create_gui(self, *args, **kwargs)
-    install_due_button(self)
-    return result
-
-MultiCardPreviewer._create_gui = patched_create_gui
+browser.search_for(f"cid:{card_id}")
 ```
 
-The click handler should resolve the current card at click time:
+## Development
 
-```python
-def on_click():
-    card_id = resolve_card_id(preview_window)
-    set_due_tomorrow(card_id)
-```
-
-This matters if a preview window can change which card it displays after opening.
-
-## Installation During Development
-
-Create a symlink from Anki's add-on folder to `preview_due_button`:
+Run a syntax check with:
 
 ```sh
-ln -s /Users/dco2/Documents/repo/anki-addon-set-due/preview_due_button \
-  "$HOME/Library/Application Support/Anki2/addons21/preview_due_button"
-```
-
-Then restart Anki.
-
-## Packaging
-
-Zip the contents of `preview_due_button` and rename the archive to:
-
-```text
-preview_due_button.ankiaddon
+python -m py_compile preview_due_button/__init__.py
 ```
