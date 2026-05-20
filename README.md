@@ -8,6 +8,7 @@ affecting the active review card.
 
 - Adds a `View` button to preview windows.
 - Adds a `Set Due Date: Tomorrow` button to preview windows.
+- Shows a number-only count of cards due tomorrow in the previewed card's top-level deck.
 - Acts on the card currently shown in the clicked preview window.
 - Leaves the active review card untouched.
 - Supports multiple preview windows at once.
@@ -64,6 +65,11 @@ Install the `.ankiaddon` file through Anki's add-on installer.
 The buttons resolve the current card from the preview window where they were
 clicked.
 
+The numeric label shows the number of cards due tomorrow in the previewed card's
+top-level deck. For a card in `Biology::Chapter 1::Enzymes`, the count is scoped
+to `Biology` and its subdecks. The label refreshes when the preview changes and
+immediately after `Set Due Date: Tomorrow` is clicked.
+
 ## Architecture
 
 The actions are instance-local:
@@ -87,6 +93,12 @@ The Browser action opens Anki's Browser with a card-specific search:
 
 ```python
 browser.search_for(f"cid:{card_id}")
+```
+
+The due-tomorrow count uses Anki's search system:
+
+```python
+deck:<top-level-deck> prop:due=1
 ```
 
 ## Development
