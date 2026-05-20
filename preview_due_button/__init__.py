@@ -3,15 +3,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Optional
 
-from aqt import mw
+from aqt import dialogs, mw
 from aqt.browser import previewer
 from aqt.qt import QDialogButtonBox, QKeySequence, qconnect
 from aqt.utils import tooltip
 
 
-BUTTON_TEXT = "Tomorrow"
+DUE_BUTTON_TEXT = "Set Due Date: Tomorrow"
+VIEW_BUTTON_TEXT = "View"
 DUE_TOMORROW = "1"
-SHORTCUT = "T"
+DUE_SHORTCUT = "T"
+VIEW_SHORTCUT = "V"
 
 
 def set_card_due_tomorrow(card_id: int, parent: Any = None) -> None:
@@ -19,6 +21,14 @@ def set_card_due_tomorrow(card_id: int, parent: Any = None) -> None:
     mw.col.sched.set_due_date([card_id], DUE_TOMORROW)
     mw.col.save()
     tooltip("Set previewed card due tomorrow", parent=parent)
+
+
+def open_card_in_browser(card_id: int, parent: Any = None) -> None:
+    """Open exactly one previewed card in Anki's browser."""
+    browser = dialogs.open("Browser", mw)
+    browser.activateWindow()
+    browser.search_for(f"cid:{card_id}")
+    tooltip("Opened previewed card in Browser", parent=parent)
 
 
 def resolve_card_id(preview_window: Any) -> Optional[int]:
@@ -42,7 +52,7 @@ def resolve_card_id(preview_window: Any) -> Optional[int]:
 
 
 def install_due_button(preview_window: Any) -> None:
-    """Install an instance-local Tomorrow button on a preview window."""
+    """Install instance-local action buttons on a preview window."""
     if getattr(preview_window, "_preview_due_button_installed", False):
         return
 
@@ -51,25 +61,48 @@ def install_due_button(preview_window: Any) -> None:
         tooltip("Preview due button could not find the button box", parent=preview_window)
         return
 
-    button = bbox.addButton(BUTTON_TEXT, QDialogButtonBox.ButtonRole.ActionRole)
-    button.setAutoDefault(False)
-    button.setShortcut(QKeySequence(SHORTCUT))
-    button.setToolTip(f"Set this previewed card due tomorrow ({SHORTCUT})")
+    layout = bbox.layout()
+    if layout is not None and hasattr(layout, "insertStretch"):
+        layout.insertStretch(layout.count(), 1)
 
-    def on_click() -> None:
+    view_button = bbox.addButton(VIEW_BUTTON_TEXT, QDialogButtonBox.ButtonRole.ActionRole)
+    view_button.setAutoDefault(False)
+    view_button.setShortcut(QKeySequence(VIEW_SHORTCUT))
+    view_button.setToolTip(f"Open this previewed card in Browser ({VIEW_SHORTCUT})")
+
+    due_button = bbox.addButton(DUE_BUTTON_TEXT, QDialogButtonBox.ButtonRole.ActionRole)
+    due_button.setAutoDefault(False)
+    due_button.setShortcut(QKeySequence(DUE_SHORTCUT))
+    due_button.setToolTip(
+        f"Set this previewed card due tomorrow ({DUE_SHORTCUT})"
+    )
+
+    def current_card_id() -> Optional[int]:
         card_id = resolve_card_id(preview_window)
         if card_id is None:
             tooltip("Could not find card for this preview window", parent=preview_window)
+        return card_id
+
+    def on_view_click() -> None:
+        card_id = current_card_id()
+        if card_id is None:
+            return
+        open_card_in_browser(card_id, parent=preview_window)
+
+    def on_due_click() -> None:
+        card_id = current_card_id()
+        if card_id is None:
             return
         set_card_due_tomorrow(card_id, parent=preview_window)
 
-    qconnect(button.clicked, on_click)
+    qconnect(view_button.clicked, on_view_click)
+    qconnect(due_button.clicked, on_due_click)
     preview_window._preview_due_button_installed = True
 
 
-def patch_previewer_create_gui() -> None:
-    """Patch Anki preview dialogs so every preview instance receives a button."""
-    preview_class = previewer.Previewer
+def patch_multi_card_previewer_create_gui() -> None:
+    """Patch Anki multi-card preview dialogs with instance-local buttons."""
+    preview_class = previewer.MultiCardPreviewer
     if getattr(preview_class, "_preview_due_button_patched", False):
         return
 
@@ -86,7 +119,7 @@ def patch_previewer_create_gui() -> None:
 
 def init() -> None:
     """Entry point loaded by Anki."""
-    patch_previewer_create_gui()
+    patch_multi_card_previewer_create_gui()
 
 
 init()
