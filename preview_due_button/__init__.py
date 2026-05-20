@@ -63,6 +63,7 @@ def resolve_card_id(preview_window: Any) -> Optional[int]:
 def top_level_deck_name(card: Card) -> str:
     """Return the topmost parent deck name for a card."""
     deck_name = mw.col.decks.name(card.current_deck_id())
+    deck_name = deck_name.replace("\x1f", "::")
     return deck_name.split("::", 1)[0]
 
 
